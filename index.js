@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+var jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
@@ -18,6 +19,7 @@ async function run(){
         await client.connect();
         const serviceCollection = client.db('doctors_portal').collection('services');
         const bookingCollection = client.db('doctors_portal').collection('bookings');
+        const userCollection = client.db('doctors_portal').collection('users');
 
       
 
@@ -26,6 +28,22 @@ async function run(){
             const cursor = serviceCollection.find(query);
             const services = await cursor.toArray();
             res.send(services);
+        })
+
+        //here user can be stored 
+        app.put('/user/:email' , async(req, res) =>{
+          const email = req.params.email;
+          const user = req.body;
+          const filter = {email: email};
+          const options = {upsert: true};
+          const updateDoc = {
+            $set: user,
+
+          };
+          const result = await userCollection.updateOne(filter, updateDoc, options);
+          const token = jwt.sign({email: email}, process.env.ACCESS_TOKEN_SECREAT,{ expiresIn: '1h'});
+          res.send({result, token})
+
         })
         //warning
         //this api is getting information from service.
@@ -66,12 +84,13 @@ async function run(){
         * app.get('/booking/:id') // get a specific booking
         * app.post('/booking') //add a new booking
         * app.patch('/booking/:id') // updating 
+        * app.put('/booking/:id') // updating / if content doesn't exist, will create new user.
         * app.delete('/booking/:id') // deleting
         */
 
         app.get('/booking', async(req, res) =>{
-          const patient = req.query.patient_email;
-          const query = {patient: patient}
+          const patient = req.query.patient;
+          const query = {patient_email: patient}
           const bookings = await bookingCollection.find(query).toArray();
           res.send(bookings);
         })
