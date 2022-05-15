@@ -69,6 +69,13 @@ async function run(){
         * app.delete('/booking/:id') // deleting
         */
 
+        app.get('/booking', async(req, res) =>{
+          const patient = req.query.patient_email;
+          const query = {patient: patient}
+          const bookings = await bookingCollection.find(query).toArray();
+          res.send(bookings);
+        })
+
         app.post('/booking', async(req, res) =>{
           const booking = req.body;
           console.log(booking);
