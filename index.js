@@ -27,6 +27,38 @@ async function run(){
             const services = await cursor.toArray();
             res.send(services);
         })
+        //warning
+        //this api is getting information from service.
+        //it will be after learning backend properly.)(aggregation)
+        //this is not the proper way of query.
+        app.get('/available', async(req, res) =>{
+          const date = req.query.date;
+
+          //step1 : get all services
+
+          const services = await serviceCollection.find().toArray();
+
+          //step2 : get the booking on that day
+          const query = {date: date};
+          const bookings = await bookingCollection.find(query).toArray();
+
+          // step 3: for each service, find bookings for that service. 
+
+          services.forEach(service => {
+            //step 4: find bookings for that service
+            const serviceBookings = bookings.filter(book => book.treatment === service.name);
+            //step 5: select slots for the service service booking
+            const bookedSlots = serviceBookings.map(book => book.slot);
+            // step 6: select those slots that are not in bookedSlots.
+            const available = service.slots.filter(slot => !bookedSlots.includes(slot));
+            //step 7: set available to slots to make it easier
+            service.slots = available;
+
+          })
+
+          res.send(services);
+
+        })
 
         /* 
         * API naming convention
@@ -39,7 +71,8 @@ async function run(){
 
         app.post('/booking', async(req, res) =>{
           const booking = req.body;
-          const query = {treatment: booking.treatment , date: booking.date, patient: booking.patient}
+          console.log(booking);
+          const query = {treatment: booking.treatment , date: booking.date, patient: booking.patient_email}
           const exists = await bookingCollection.findOne(query);
           if(exists){
             return res.send({success: false, booking: exists})
