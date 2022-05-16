@@ -10,6 +10,27 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+function verifyJWT(req, res, next){
+  const authHeader = req.headers.authorization;
+  if(!authHeader){
+    return res.status(401).send({message: 'UnAuthorized access'});
+  }
+  //here
+  //for example: = authHeader.split(' ').[1]
+  //output: ['Bearer', 'theToken']
+  //output: 'the token'
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECREAT, function(err, decoded){
+    if(err){
+      return res.status(403).send({message: 'Forbidden'})
+    }
+    req.decoded = decoded;
+    next();
+  })
+}
+
+
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.0patr.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
@@ -28,6 +49,12 @@ async function run(){
             const cursor = serviceCollection.find(query);
             const services = await cursor.toArray();
             res.send(services);
+        })
+
+        //get in shortcut
+        app.get('/user', async(req, res)=>{
+          const users = await userCollection.find().toArray();
+          res.send(users);
         })
 
         //here user can be stored 
@@ -88,11 +115,21 @@ async function run(){
         * app.delete('/booking/:id') // deleting
         */
 
-        app.get('/booking', async(req, res) =>{
+        app.get('/booking',verifyJWT, async(req, res) =>{
           const patient = req.query.patient;
-          const query = {patient_email: patient}
-          const bookings = await bookingCollection.find(query).toArray();
-          res.send(bookings);
+          //================
+          const decodedEmail = req.decoded.email;
+          //if the decoded email and user email are same 
+          if(patient === decodedEmail){
+            const query = {patient_email: patient}
+            const bookings = await bookingCollection.find(query).toArray();
+            res.send(bookings);
+          }
+          else{
+            return res.status(403).send({message: 'forbidden access'})
+          }
+          //================
+
         })
 
         app.post('/booking', async(req, res) =>{
