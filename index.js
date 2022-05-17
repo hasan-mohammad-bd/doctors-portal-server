@@ -31,8 +31,45 @@ function verifyJWT(req, res, next){
   })
 }
 
-function sendAppointmentEmail(){
-  
+//to use this in different place.
+const emailSenderOptions = {
+  auth: {
+    api_key: process.env.EMAIL_SENDER_KEY
+  }
+}
+
+const emailClient = nodemailer.createTransport(sgTransport(emailSenderOptions));
+
+//sending email to patient email.
+function sendAppointmentEmail(booking){
+  const {patient_email, patientName, treatment,date, slot } = booking;
+
+  var email = {
+    from: process.env.EMAIL_SENDER,
+    to: patient_email,
+    subject: `Your Appointment for ${treatment} is on ${date} at ${slot} is Confirmed`,
+    text: `Your Appointment for ${treatment} is on ${date} at ${slot} is Confirmed`,
+    html: `
+    <div>
+      <h1>Hello, ${patientName},</h1>
+      <h3>Your Appointment for ${treatment} is confirmed</h3>
+      <p>Looking forward to seeing you on ${date} at ${slot}</p>
+      <h3>Our Address</h3>
+      <p>Andor Killa Bandorban</p>
+      <p>Bangladesh</p>
+      <a href="https://web.programming-hero.com/">unsubscribe</a>
+    </div>
+    `
+  };
+
+  emailClient.sendMail(email, function(err, info){
+    if (err ){
+      console.log(err);
+    }
+    else {
+      console.log('Message sent:', info);
+    }
+});
 }
 
 
@@ -93,10 +130,6 @@ async function run(){
             const result = await userCollection.updateOne(filter, updateDoc);
             res.send(result)
           
-
-
-
-
         })
 
         //here user can be stored 
@@ -183,6 +216,11 @@ async function run(){
             return res.send({success: false, booking: exists})
           }
           const result = await bookingCollection.insertOne(booking)
+         // =====================================
+          //sending email to patient email.
+          console.log('sending email');
+          sendAppointmentEmail(booking)
+          // ====================================
           return res.send({success: true, result})
         })
 
