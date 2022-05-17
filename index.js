@@ -3,6 +3,8 @@ const cors = require('cors');
 require('dotenv').config();
 var jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion } = require('mongodb');
+var nodemailer = require('nodemailer');
+var sgTransport = require('nodemailer-sendgrid-transport');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -29,6 +31,10 @@ function verifyJWT(req, res, next){
   })
 }
 
+function sendAppointmentEmail(){
+  
+}
+
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.0patr.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
@@ -41,12 +47,24 @@ async function run(){
         const serviceCollection = client.db('doctors_portal').collection('services');
         const bookingCollection = client.db('doctors_portal').collection('bookings');
         const userCollection = client.db('doctors_portal').collection('users');
+        const doctorCollection = client.db('doctors_portal').collection('doctors');
 
-      
+      const verifyAdmin = async (req, res, next) =>{
+        const email = req.params.email;
+        //getting the user email to check whether he is admin or not.
+        const requester = req.decoded.email;
+        const requesterAccount = await userCollection.findOne({email: requester});
+        if(requesterAccount.role === 'admin'){
+          next()
+        }
+        else{
+          res.status(403).send({message: 'forbidden'})
+        }
+      }
 
         app.get('/service', async(req, res) =>{
             const query = {};
-            const cursor = serviceCollection.find(query);
+            const cursor = serviceCollection.find(query).project({name: 1});
             const services = await cursor.toArray();
             res.send(services);
         })
@@ -65,27 +83,17 @@ async function run(){
           res.send({admin: isAdmin})
         })
 
-        //here no need to new user 
-        app.put('/user/admin/:email' , verifyJWT, async(req, res) =>{
-          const email = req.params.email;
-          //getting the user email to check whether he is admin or not.
-          const requester = req.decoded.email;
-          const requesterAccount = await userCollection.findOne({email: requester});
-          if(requesterAccount.role === 'admin'){
-
+        //here no need to add new user 
+        app.put('/user/admin/:email' ,verifyAdmin, verifyJWT, async(req, res) =>{
+            const email = req.params.email;
             const filter = {email: email};
-
             const updateDoc = {
               $set: {role: 'admin'}
-  
             };
             const result = await userCollection.updateOne(filter, updateDoc);
-  
             res.send(result)
-          }
-          else{
-            res.status(403).send({message:'forbidden'})
-          }
+          
+
 
 
 
@@ -176,6 +184,26 @@ async function run(){
           }
           const result = await bookingCollection.insertOne(booking)
           return res.send({success: true, result})
+        })
+
+        //sending doctors list 
+        app.get('/doctor' , verifyJWT, verifyAdmin, async(req, res) =>{
+          const doctors = await doctorCollection.find().toArray();
+          res.send(doctors);
+        } )
+
+        //adding doctors
+
+        app.post('/doctor',verifyJWT,verifyAdmin, async(req, res) => {
+          const doctor = req.body;
+          const result = await doctorCollection.insertOne(doctor);
+          res.send(result)
+        })
+        app.delete('/doctor/:email',verifyJWT,verifyAdmin, async(req, res) => {
+          const email = req.params.email;
+          const filter = {email: email}
+          const result = await doctorCollection.deleteOne(filter);
+          res.send(result)
         })
 
 
