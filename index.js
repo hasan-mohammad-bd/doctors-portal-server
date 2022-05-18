@@ -2,9 +2,10 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 var jwt = require('jsonwebtoken');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 var nodemailer = require('nodemailer');
 var sgTransport = require('nodemailer-sendgrid-transport');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -99,12 +100,28 @@ async function run(){
         }
       }
 
+      app.post('/create-payment-intent', verifyJWT, async(req, res) =>{
+        const service = req.body;
+        const price = service.price;
+        const amount = price*100;
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount : amount,
+          currency: 'usd',
+          payment_method_types:['card']
+        });
+        res.send({clientSecret: paymentIntent.client_secret})
+      });
+
         app.get('/service', async(req, res) =>{
             const query = {};
             const cursor = serviceCollection.find(query).project({name: 1});
             const services = await cursor.toArray();
             res.send(services);
+            
         })
+
+
+
 
         //get in shortcut
         app.get('/user', verifyJWT, async(req, res)=>{
@@ -205,6 +222,13 @@ async function run(){
           }
           //================
 
+        })
+
+        app.get('/booking/:id', async(req,res)=>{
+          const id = req.params.id;
+          const query = {_id: ObjectId(id)}
+          const booking = await bookingCollection.findOne(query);
+          res.send(booking);
         })
 
         app.post('/booking', async(req, res) =>{
